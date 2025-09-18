@@ -100,9 +100,10 @@ function BookingDialog({
     };
 
     let totalCost = 0;
-    
+    const durationMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+
     if(!pricingRule.peakStartTime || !pricingRule.peakEndTime) {
-      const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+      const durationHours = durationMinutes / 60;
       totalCost = durationHours * pricingRule.offPeakPrice;
       setCalculatedPrice(totalCost);
       return;
@@ -116,41 +117,31 @@ function BookingDialog({
     const [peakEndHours, peakEndMinutes] = pricingRule.peakEndTime.split(':').map(Number);
     peakEnd.setHours(peakEndHours, peakEndMinutes, 0, 0);
 
-    let currentHour = new Date(startDate);
-    
-    while(currentHour < endDate) {
-      const isPeak = currentHour >= peakStart && currentHour < peakEnd;
-      totalCost += isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice;
-      currentHour.setHours(currentHour.getHours() + 1);
+    let currentMinute = new Date(startDate);
+    let peakMinutes = 0;
+    let offPeakMinutes = 0;
+
+    while(currentMinute < endDate) {
+      const isPeak = currentMinute >= peakStart && currentMinute < peakEnd;
+      if (isPeak) {
+        peakMinutes++;
+      } else {
+        offPeakMinutes++;
+      }
+      currentMinute.setMinutes(currentMinute.getMinutes() + 1);
     }
     
-    const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
-
-    // Prorate last hour
-    if (durationHours > 1 && durationHours % 1 !== 0) {
-      const lastFullHour = new Date(endDate);
-      lastFullHour.setHours(Math.floor(endHours), 0, 0, 0);
-      
-      const isPeak = lastFullHour >= peakStart && lastFullHour < peakEnd;
-      totalCost -= isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice;
-      totalCost += (isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice) * (durationHours % 1);
-    } else if (durationHours < 1) {
-       const isPeak = startDate >= peakStart && startDate < peakEnd;
-       totalCost = (isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice) * durationHours;
-    }
-
+    totalCost = (peakMinutes / 60) * pricingRule.peakPrice + (offPeakMinutes / 60) * pricingRule.offPeakPrice;
 
     setCalculatedPrice(totalCost);
   };
 
   useEffect(() => {
     const subscription = form.watch(() => calculatePrice());
+    calculatePrice(); // Initial calculation
     return () => subscription.unsubscribe();
-  }, [form, calculatePrice]);
-
-  useEffect(() => {
-    calculatePrice();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch, pricingRule]);
 
 
   const onSubmit = (values: z.infer<typeof bookingFormSchema>) => {
