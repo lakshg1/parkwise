@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useParkingStore } from '@/hooks/use-parking-store';
@@ -8,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Ticket, Car, Bike, User, Tag, Calendar, Clock, ParkingSquare, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Skeleton } from '../ui/skeleton';
 
 export default function BookingDetails({ bookingId }: { bookingId: string }) {
@@ -117,10 +118,14 @@ export default function BookingDetails({ bookingId }: { bookingId: string }) {
               <User className="h-5 w-5 text-muted-foreground" />
               <span><strong>Name:</strong> {booking.userName}</span>
             </div>
-            <div className="flex items-center gap-3">
+             <div className="flex items-center gap-3">
               {booking.vehicleType === 'car' 
                 ? <Car className="h-5 w-5 text-muted-foreground" /> 
                 : <Bike className="h-5 w-5 text-muted-foreground" />}
+              <span className="capitalize"><strong>Vehicle Type:</strong> {booking.vehicleType}</span>
+            </div>
+            <div className="flex items-center gap-3">
+               <div className="w-5 h-5 text-muted-foreground" />
               <span><strong>Vehicle No:</strong> {booking.vehicleNumber}</span>
             </div>
             <div className="flex items-center gap-3">
@@ -135,7 +140,7 @@ export default function BookingDetails({ bookingId }: { bookingId: string }) {
               <Calendar className="h-5 w-5 text-muted-foreground" />
               <span><strong>Date:</strong> {booking.startTime.toLocaleDateString()}</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 col-span-full">
               <Clock className="h-5 w-5 text-muted-foreground" />
               <span>
                 <strong>Time:</strong> {booking.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {booking.endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
