@@ -5,15 +5,15 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Ticket, Car, Bike, User, Tag, Calendar, Clock, ParkingSquare } from 'lucide-react';
+import { Ticket, Car, Bike, User, Tag, Calendar, Clock, ParkingSquare, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '../ui/skeleton';
 
 export default function BookingDetails({ bookingId }: { bookingId: string }) {
   const { user } = useAuth();
-  const { getBooking, cancelBooking, getLot, getSlotsByLot } = useParkingStore();
+  const { getBooking, cancelBooking, getLot, getSlotsByLot, getPricingRule } = useParkingStore();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -24,6 +24,46 @@ export default function BookingDetails({ bookingId }: { bookingId: string }) {
   }, [user, router]);
 
   const booking = getBooking(bookingId);
+  const lot = booking ? getLot(booking.lotId) : undefined;
+  const slot = booking ? getSlotsByLot(booking.lotId).find(s => s.id === booking.slotId) : undefined;
+  const pricingRule = booking ? getPricingRule(booking.lotId, booking.vehicleType) : undefined;
+
+  const priceDetails = useMemo(() => {
+    if (!booking || !pricingRule) return null;
+
+    const { startTime, endTime } = booking;
+    if (endTime <= startTime) return { peakMinutes: 0, offPeakMinutes: 0 };
+    
+    if(!pricingRule.peakStartTime || !pricingRule.peakEndTime) {
+        const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+        return { peakMinutes: 0, offPeakMinutes: durationMinutes };
+    }
+
+    const peakStart = new Date(startTime);
+    const [peakStartHours, peakStartMinutes] = pricingRule.peakStartTime.split(':').map(Number);
+    peakStart.setHours(peakStartHours, peakStartMinutes, 0, 0);
+
+    const peakEnd = new Date(startTime);
+    const [peakEndHours, peakEndMinutes] = pricingRule.peakEndTime.split(':').map(Number);
+    peakEnd.setHours(peakEndHours, peakEndMinutes, 0, 0);
+
+    let currentMinute = new Date(startTime);
+    let peakMinutes = 0;
+    let offPeakMinutes = 0;
+
+    while (currentMinute < endTime) {
+      const isPeak = currentMinute >= peakStart && currentMinute < peakEnd;
+      if (isPeak) {
+        peakMinutes++;
+      } else {
+        offPeakMinutes++;
+      }
+      currentMinute.setMinutes(currentMinute.getMinutes() + 1);
+    }
+    
+    return { peakMinutes, offPeakMinutes };
+  }, [booking, pricingRule]);
+
 
   if (!user) {
     return <Skeleton className="h-96 w-full" />
@@ -41,9 +81,6 @@ export default function BookingDetails({ bookingId }: { bookingId: string }) {
     );
   }
 
-  const lot = getLot(booking.lotId);
-  const slot = getSlotsByLot(booking.lotId).find(s => s.id === booking.slotId);
-
   const handleCancel = () => {
     cancelBooking(booking.id);
     toast({
@@ -52,6 +89,12 @@ export default function BookingDetails({ bookingId }: { bookingId: string }) {
     });
     router.push('/dashboard');
   };
+  
+  const peakHours = priceDetails ? priceDetails.peakMinutes / 60 : 0;
+  const offPeakHours = priceDetails ? priceDetails.offPeakMinutes / 60 : 0;
+  const peakCost = pricingRule ? peakHours * pricingRule.peakPrice : 0;
+  const offPeakCost = pricingRule ? offPeakHours * pricingRule.offPeakPrice : 0;
+
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -99,6 +142,37 @@ export default function BookingDetails({ bookingId }: { bookingId: string }) {
               </span>
             </div>
           </div>
+          
+           {pricingRule && priceDetails && (
+            <Card className="bg-secondary/50">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <Wallet className="h-5 w-5" />
+                        Price Breakdown
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                    {peakHours > 0 && (
+                         <div className="flex justify-between">
+                            <span className="text-muted-foreground">Peak Hours ({peakHours.toFixed(2)} hrs &times; ${pricingRule.peakPrice}/hr)</span>
+                            <span>${peakCost.toFixed(2)}</span>
+                        </div>
+                    )}
+                    {offPeakHours > 0 && (
+                         <div className="flex justify-between">
+                            <span className="text-muted-foreground">Off-Peak Hours ({offPeakHours.toFixed(2)} hrs &times; ${pricingRule.offPeakPrice}/hr)</span>
+                            <span>${offPeakCost.toFixed(2)}</span>
+                        </div>
+                    )}
+                    <div className="border-t border-dashed my-2" />
+                    <div className="flex justify-between font-bold text-base">
+                        <span>Total Price</span>
+                        <span>${(booking.price ?? 0).toFixed(2)}</span>
+                    </div>
+                </CardContent>
+            </Card>
+           )}
+
         </CardContent>
         <CardFooter className="flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground">Thank you for using ParkWise!</p>
