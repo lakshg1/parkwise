@@ -100,6 +100,14 @@ function BookingDialog({
     };
 
     let totalCost = 0;
+    
+    if(!pricingRule.peakStartTime || !pricingRule.peakEndTime) {
+      const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+      totalCost = durationHours * pricingRule.offPeakPrice;
+      setCalculatedPrice(totalCost);
+      return;
+    }
+    
     const peakStart = new Date();
     const [peakStartHours, peakStartMinutes] = pricingRule.peakStartTime.split(':').map(Number);
     peakStart.setHours(peakStartHours, peakStartMinutes, 0, 0);
@@ -119,21 +127,30 @@ function BookingDialog({
     const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
 
     // Prorate last hour
-    if (durationHours % 1 !== 0) {
+    if (durationHours > 1 && durationHours % 1 !== 0) {
       const lastFullHour = new Date(endDate);
-      lastFullHour.setHours(lastFullHour.getHours() - (durationHours % 1));
+      lastFullHour.setHours(Math.floor(endHours), 0, 0, 0);
       
       const isPeak = lastFullHour >= peakStart && lastFullHour < peakEnd;
       totalCost -= isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice;
       totalCost += (isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice) * (durationHours % 1);
+    } else if (durationHours < 1) {
+       const isPeak = startDate >= peakStart && startDate < peakEnd;
+       totalCost = (isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice) * durationHours;
     }
+
 
     setCalculatedPrice(totalCost);
   };
 
   useEffect(() => {
+    const subscription = form.watch(() => calculatePrice());
+    return () => subscription.unsubscribe();
+  }, [form, calculatePrice]);
+
+  useEffect(() => {
     calculatePrice();
-  }, [form.watch('startTime'), form.watch('endTime')]);
+  }, []);
 
 
   const onSubmit = (values: z.infer<typeof bookingFormSchema>) => {
@@ -416,3 +433,5 @@ export default function ParkingAvailability() {
     </div>
   );
 }
+
+    
