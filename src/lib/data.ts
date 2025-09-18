@@ -2,6 +2,7 @@ import type { ParkingLot, ParkingSlot, PricingRule, User } from './types';
 
 export const mockUsers: User[] = [
   { id: '1', name: 'John Doe', email: 'john@example.com', role: 'user' },
+  { id: '3', name: 'Jane Smith', email: 'jane@example.com', role: 'user' },
   { id: '2', name: 'Admin User', email: 'admin@example.com', role: 'admin' },
 ];
 
