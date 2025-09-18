@@ -10,14 +10,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Car, Bike, HardHat, ChevronDown, ChevronRight, Ban } from 'lucide-react';
-import { useState } from 'react';
-import type { ParkingSlot } from '@/lib/types';
+import { PlusCircle, Car, Bike, ChevronDown, ChevronRight, Save } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import type { ParkingSlot } from '@/lib/types';
 
 const lotFormSchema = z.object({
   name: z.string().min(3, 'Lot name must be at least 3 characters.'),
@@ -28,10 +28,25 @@ const lotFormSchema = z.object({
 
 const LotSlotsManager = ({ lotId }: { lotId: string }) => {
     const { getSlotsByLot, setSlotStatus } = useParkingStore();
+    const { toast } = useToast();
     const slots = getSlotsByLot(lotId);
-  
-    const handleStatusChange = (slotId: string, newStatus: boolean) => {
-        setSlotStatus(slotId, newStatus ? 'available' : 'maintenance');
+    const [localSlots, setLocalSlots] = useState<ParkingSlot[]>(JSON.parse(JSON.stringify(slots)));
+
+    const handleStatusChange = (slotId: string, isEnabled: boolean) => {
+        setLocalSlots(prev => 
+            prev.map(slot => 
+                slot.id === slotId ? { ...slot, status: isEnabled ? 'available' : 'maintenance' } : slot
+            )
+        );
+    };
+
+    const handleSaveChanges = (slot: ParkingSlot) => {
+        const newStatus = slot.status;
+        setSlotStatus(slot.id, newStatus);
+        toast({
+            title: "Slot Status Updated",
+            description: `Slot ${slot.slotNumber} is now set to ${newStatus}.`,
+        });
     };
     
     return (
@@ -43,11 +58,12 @@ const LotSlotsManager = ({ lotId }: { lotId: string }) => {
                   <TableHead>Slot</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Maintenance Mode</TableHead>
+                  <TableHead>Maintenance Mode</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {slots.map(slot => (
+                {localSlots.map(slot => (
                   <TableRow key={slot.id}>
                     <TableCell className="font-medium">{slot.slotNumber}</TableCell>
                     <TableCell>
@@ -70,18 +86,23 @@ const LotSlotsManager = ({ lotId }: { lotId: string }) => {
                             {slot.status}
                          </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                            <Label htmlFor={`maintenance-switch-${slot.id}`}>
-                                {slot.status === 'maintenance' ? 'On' : 'Off'}
-                            </Label>
+                    <TableCell>
+                        <div className="flex items-center gap-2">
                             <Switch
                                 id={`maintenance-switch-${slot.id}`}
                                 checked={slot.status === 'maintenance'}
                                 onCheckedChange={(checked) => handleStatusChange(slot.id, !checked)}
                                 disabled={slot.status === 'occupied'}
                             />
+                             <Label htmlFor={`maintenance-switch-${slot.id}`}>
+                                {slot.status === 'maintenance' ? 'On' : 'Off'}
+                            </Label>
                         </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleSaveChanges(slot)} disabled={slots.find(s => s.id === slot.id)?.status === slot.status}>
+                            <Save className="h-5 w-5" />
+                        </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -92,7 +113,7 @@ const LotSlotsManager = ({ lotId }: { lotId: string }) => {
 }
 
 export default function LotManager() {
-  const { lots, addLot } = useParkingStore();
+  const { lots, addLot, getSlotsByLot } = useParkingStore();
   const { toast } = useToast();
   const [openLotId, setOpenLotId] = useState<string | null>(null);
 
@@ -115,6 +136,20 @@ export default function LotManager() {
     form.reset();
   }
 
+  const lotsWithAvailability = useMemo(() => {
+    return lots.map(lot => {
+      const slots = getSlotsByLot(lot.id);
+      const availableCarSlots = slots.filter(s => s.slotType === 'car' && s.status === 'available').length;
+      const availableBikeSlots = slots.filter(s => s.slotType === 'bike' && s.status === 'available').length;
+      
+      return {
+        ...lot,
+        availableCarSlots,
+        availableBikeSlots,
+      };
+    });
+  }, [lots, getSlotsByLot]);
+
   return (
     <div className="grid md:grid-cols-3 gap-8 items-start">
       <div className="md:col-span-2 space-y-4">
@@ -124,7 +159,7 @@ export default function LotManager() {
             <CardDescription>A list of all parking lots currently in the system. Click to manage slots.</CardDescription>
           </CardHeader>
           <CardContent>
-            {lots.map(lot => (
+            {lotsWithAvailability.map(lot => (
                 <Collapsible key={lot.id} open={openLotId === lot.id} onOpenChange={() => setOpenLotId(prev => prev === lot.id ? null : lot.id)}>
                     <CollapsibleTrigger asChild>
                        <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
@@ -133,11 +168,11 @@ export default function LotManager() {
                                 <p className="text-sm text-muted-foreground">{lot.location}</p>
                             </div>
                              <div className="flex items-center gap-6 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <Car className="h-5 w-5"/> {lot.totalCarSlots}
+                                <div className="flex items-center gap-2" title="Available Car Slots / Total Car Slots">
+                                    <Car className="h-5 w-5"/> {lot.availableCarSlots} / {lot.totalCarSlots}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Bike className="h-5 w-5"/> {lot.totalBikeSlots}
+                                <div className="flex items-center gap-2" title="Available Bike Slots / Total Bike Slots">
+                                    <Bike className="h-5 w-5"/> {lot.availableBikeSlots} / {lot.totalBikeSlots}
                                 </div>
                                 {openLotId === lot.id ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                             </div>
