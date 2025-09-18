@@ -33,7 +33,12 @@ export default function Header() {
           <Logo />
         </Link>
         <nav className="flex items-center space-x-6 text-sm font-medium">
-          {user && <NavLink href="/dashboard">Dashboard</NavLink>}
+          {user && (
+            <>
+              <NavLink href="/dashboard">Dashboard</NavLink>
+              <NavLink href="/dashboard/my-bookings">My Bookings</NavLink>
+            </>
+          )}
           {user?.role === 'admin' && (
             <>
                 <NavLink href="/admin/pricing">Pricing</NavLink>
