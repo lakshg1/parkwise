@@ -38,43 +38,57 @@ export async function generateParkingReports(
   return generateParkingReportsFlow(input);
 }
 
-const analyzeParkingData = ai.defineTool({
-  name: 'analyzeParkingData',
-  description: 'Analyzes parking data and provides suggestions for improvements.',
-  inputSchema: z.object({
-    report: z
+const analyzeParkingData = ai.defineTool(
+  {
+    name: 'analyzeParkingData',
+    description:
+      'Analyzes parking data and provides suggestions for improvements.',
+    inputSchema: z.object({
+      report: z
+        .string()
+        .describe(
+          'The parking report data, including occupancy and revenue, in CSV format.'
+        ),
+    }),
+    outputSchema: z
       .string()
-      .describe(
-        'The parking report data, including occupancy and revenue, in CSV format.'
-      ),
-  }),
-  outputSchema: z.string().describe('Suggestions for improvements based on the data.'),
-},
-  async (input) => {
-    // Placeholder implementation for the tool
-    // In a real application, this would call an external service or perform complex calculations
-    return `This is a placeholder analysis for the parking data:\n${input.report}\nConsider optimizing pricing during peak hours.`;
+      .describe('Suggestions for improvements based on the data.'),
+  },
+  async input => {
+    const {output} = await ai.generate({
+      prompt: `Analyze the following CSV parking data and provide suggestions for improvements. Focus on trends in occupancy and revenue.
+
+        CSV Data:
+        ${input.report}
+      `,
+    });
+    return output!;
   }
 );
 
 const generateReportPrompt = ai.definePrompt({
   name: 'generateReportPrompt',
   input: {schema: GenerateParkingReportsInputSchema},
-  output: {schema: GenerateParkingReportsOutputSchema},
-  tools: [analyzeParkingData],
-  prompt: `You are an AI assistant tasked with generating parking reports and analyzing parking data.
+  output: {
+    schema: z.object({
+      csv: z.string().describe('The report in CSV format.'),
+    }),
+  },
+  prompt: `You are an AI assistant tasked with generating parking reports.
 
   Generate a report summarizing the occupancy and revenue for parking lot {{lotId}} between {{dateRangeStart}} and {{dateRangeEnd}}.
   The report must be in CSV format.
 
-  After generating the report, use the analyzeParkingData tool to analyze the report and provide suggestions for improvements.
-
-  The report should include the following columns:\n  - Date (YYYY-MM-DD)\n  - Total Bookings\n  - Total Revenue\n  - Average Occupancy
-
-  Return the report in the 'report' field and the analysis in the 'analysis' field.
+  The report should include the following columns:
+  - Date (YYYY-MM-DD)
+  - Total Bookings
+  - Total Revenue
+  - Average Occupancy
 
   Example report:
-  Date,Total Bookings,Total Revenue,Average Occupancy\n  2024-01-01,10,100,0.5\n  2024-01-02,15,150,0.75`,
+  Date,Total Bookings,Total Revenue,Average Occupancy
+  2024-01-01,10,100,0.5
+  2024-01-02,15,150,0.75`,
 });
 
 const generateParkingReportsFlow = ai.defineFlow(
@@ -84,7 +98,16 @@ const generateParkingReportsFlow = ai.defineFlow(
     outputSchema: GenerateParkingReportsOutputSchema,
   },
   async input => {
-    const {output} = await generateReportPrompt(input);
-    return output!;
+    const {output: reportOutput} = await generateReportPrompt(input);
+    if (!reportOutput) {
+      throw new Error('Failed to generate report');
+    }
+
+    const analysis = await analyzeParkingData({report: reportOutput.csv});
+
+    return {
+      report: reportOutput.csv,
+      analysis: analysis,
+    };
   }
 );
