@@ -13,21 +13,22 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Car, Bike } from 'lucide-react';
-import type { ParkingLot, ParkingSlot, VehicleType } from '@/lib/types';
+import type { ParkingSlot, VehicleType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { BookingDialog } from './booking-dialog';
 import SlotGrid from './slot-grid';
 
 export default function ParkingAvailability() {
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
-  const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<ParkingSlot | null>(null);
   const { lots, getSlotsByLot } = useParkingStore();
 
   const selectedLot = useMemo(() => {
-    if (!selectedLotId) return null;
-    return lots.find(lot => lot.id === selectedLotId) || null;
-  }, [selectedLotId, lots]);
+    if (!selectedSlot) return null;
+    return lots.find(lot => lot.id === selectedSlot.lotId) || null;
+  }, [selectedSlot, lots]);
+  
+  const [expandedLot, setExpandedLot] = useState<string | null>(null);
 
   const handleSlotClick = (slot: ParkingSlot) => {
     if (vehicleType === 'car') {
@@ -43,6 +44,10 @@ export default function ParkingAvailability() {
       }
     }
   };
+  
+  const toggleLotExpansion = (lotId: string) => {
+    setExpandedLot(prev => (prev === lotId ? null : lotId));
+  }
 
   const lotsWithAvailability = useMemo(() => {
     return lots.map(lot => {
@@ -105,9 +110,9 @@ export default function ParkingAvailability() {
             key={lot.id} 
             className={cn(
               "cursor-pointer hover:border-primary transition-colors",
-              selectedLot?.id === lot.id && "border-primary"
+              expandedLot === lot.id && "border-primary"
             )}
-            onClick={() => setSelectedLotId(lot.id === selectedLotId ? null : lot.id)}
+            onClick={() => toggleLotExpansion(lot.id)}
           >
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -130,10 +135,10 @@ export default function ParkingAvailability() {
                   </div>
               </div>
             </CardHeader>
-            {selectedLotId === lot.id && (
+            {expandedLot === lot.id && (
               <CardContent>
                 <SlotGrid 
-                  lot={selectedLot!} 
+                  lot={lot} 
                   vehicleType={vehicleType} 
                   onSlotClick={handleSlotClick} 
                 />
