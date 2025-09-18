@@ -56,6 +56,7 @@ const analyzeParkingData = ai.defineTool(
   },
   async input => {
     const {output} = await ai.generate({
+      model: 'googleai/gemini-2.5-flash',
       prompt: `Analyze the following CSV parking data and provide suggestions for improvements. Focus on trends in occupancy and revenue.
 
         CSV Data:
@@ -74,21 +75,17 @@ const generateReportPrompt = ai.definePrompt({
       csv: z.string().describe('The report in CSV format.'),
     }),
   },
-  prompt: `You are an AI assistant tasked with generating parking reports.
-
-  Generate a report summarizing the occupancy and revenue for parking lot {{lotId}} between {{dateRangeStart}} and {{dateRangeEnd}}.
-  The report must be in CSV format.
-
-  The report should include the following columns:
-  - Date (YYYY-MM-DD)
-  - Total Bookings
-  - Total Revenue
-  - Average Occupancy
-
-  Example report:
-  Date,Total Bookings,Total Revenue,Average Occupancy
-  2024-01-01,10,100,0.5
-  2024-01-02,15,150,0.75`,
+  prompt: `Generate a CSV report for parking lot {{lotId}} from {{dateRangeStart}} to {{dateRangeEnd}}.
+The report should contain: Date,Total Bookings,Total Revenue,Average Occupancy.
+- Date format: YYYY-MM-DD
+- Total Bookings: Count of bookings per day.
+- Total Revenue: Sum of revenue per day.
+- Average Occupancy: A float between 0.0 and 1.0 representing the percentage of slots occupied.
+Create realistic but fictional data for this report.
+Example:
+Date,Total Bookings,Total Revenue,Average Occupancy
+2024-01-01,10,100,0.5
+2024-01-02,15,150,0.75`,
 });
 
 const generateParkingReportsFlow = ai.defineFlow(
