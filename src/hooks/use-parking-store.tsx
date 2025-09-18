@@ -15,6 +15,9 @@ import type {
   VehicleType,
 } from '@/lib/types';
 
+type AddBookingData = Omit<Booking, 'id' | 'status'>;
+
+
 interface ParkingState {
   lots: ParkingLot[];
   slots: ParkingSlot[];
@@ -24,7 +27,7 @@ interface ParkingState {
   getSlotsByLot: (lotId: string) => ParkingSlot[];
   getBooking: (bookingId: string) => Booking | undefined;
   getPricingRule: (lotId: string, vehicleType: VehicleType) => PricingRule | undefined;
-  addBooking: (bookingData: Omit<Booking, 'id' | 'status' | 'startTime' | 'endTime'>) => Booking;
+  addBooking: (bookingData: AddBookingData) => Booking;
   cancelBooking: (bookingId: string) => void;
   updatePricingRule: (updatedRule: PricingRule) => void;
 }
@@ -47,13 +50,11 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
     return pricingRules.find(r => r.lotId === lotId && r.vehicleType === vehicleType);
   }, [pricingRules]);
 
-  const addBooking = (bookingData: Omit<Booking, 'id' | 'status' | 'startTime' | 'endTime'>): Booking => {
+  const addBooking = (bookingData: AddBookingData): Booking => {
     const newBooking: Booking = {
       ...bookingData,
       id: `BOOK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       status: 'confirmed',
-      startTime: new Date(),
-      endTime: new Date(Date.now() + 2 * 60 * 60 * 1000), // Default 2 hours booking
     };
     
     setSlots(prevSlots => {

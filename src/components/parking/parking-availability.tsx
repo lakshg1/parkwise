@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParkingStore } from '@/hooks/use-parking-store';
 import {
   Card,
@@ -41,6 +42,8 @@ import { useAuth } from '@/hooks/use-auth';
 const bookingFormSchema = z.object({
   userName: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   vehicleNumber: z.string().min(3, { message: 'Vehicle number must be at least 3 characters.' }),
+  startTime: z.string().min(1, 'Start time is required.'),
+  endTime: z.string().min(1, 'End time is required.'),
 });
 
 function BookingDialog({
@@ -60,21 +63,99 @@ function BookingDialog({
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  
+  const defaultStartTime = new Date();
+  const defaultEndTime = new Date(defaultStartTime.getTime() + 2 * 60 * 60 * 1000);
 
   const form = useForm<z.infer<typeof bookingFormSchema>>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: {
       userName: user?.name || '',
       vehicleNumber: '',
+      startTime: defaultStartTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      endTime: defaultEndTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     },
   });
 
+  const pricingRule = getPricingRule(lot.id, vehicleType);
+
+  const calculatePrice = () => {
+    if (!pricingRule) return;
+
+    const { startTime, endTime } = form.getValues();
+    if (!startTime || !endTime) return;
+    
+    const startDate = new Date();
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    startDate.setHours(startHours, startMinutes, 0, 0);
+
+    const endDate = new Date();
+    const [endHours, endMinutes] = endTime.split(':').map(Number);
+    endDate.setHours(endHours, endMinutes, 0, 0);
+
+    if (endDate <= startDate) {
+      setCalculatedPrice(0);
+      return;
+    };
+
+    let totalCost = 0;
+    const peakStart = new Date();
+    const [peakStartHours, peakStartMinutes] = pricingRule.peakStartTime.split(':').map(Number);
+    peakStart.setHours(peakStartHours, peakStartMinutes, 0, 0);
+    
+    const peakEnd = new Date();
+    const [peakEndHours, peakEndMinutes] = pricingRule.peakEndTime.split(':').map(Number);
+    peakEnd.setHours(peakEndHours, peakEndMinutes, 0, 0);
+
+    let currentHour = new Date(startDate);
+    
+    while(currentHour < endDate) {
+      const isPeak = currentHour >= peakStart && currentHour < peakEnd;
+      totalCost += isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice;
+      currentHour.setHours(currentHour.getHours() + 1);
+    }
+    
+    const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+
+    // Prorate last hour
+    if (durationHours % 1 !== 0) {
+      const lastFullHour = new Date(endDate);
+      lastFullHour.setHours(lastFullHour.getHours() - (durationHours % 1));
+      
+      const isPeak = lastFullHour >= peakStart && lastFullHour < peakEnd;
+      totalCost -= isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice;
+      totalCost += (isPeak ? pricingRule.peakPrice : pricingRule.offPeakPrice) * (durationHours % 1);
+    }
+
+    setCalculatedPrice(totalCost);
+  };
+
+  useEffect(() => {
+    calculatePrice();
+  }, [form.watch('startTime'), form.watch('endTime')]);
+
+
   const onSubmit = (values: z.infer<typeof bookingFormSchema>) => {
+    const { startTime, endTime } = values;
+    
+    const startDate = new Date();
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    startDate.setHours(startHours, startMinutes, 0, 0);
+    
+    const endDate = new Date();
+    const [endHours, endMinutes] = endTime.split(':').map(Number);
+    endDate.setHours(endHours, endMinutes, 0, 0);
+
     const newBooking = addBooking({
-      ...values,
+      userName: values.userName,
+      vehicleNumber: values.vehicleNumber,
       vehicleType,
       slotId: slot.id,
       lotId: lot.id,
+      startTime: startDate,
+      endTime: endDate,
+      price: calculatedPrice || 0,
     });
     onOpenChange(false);
     toast({
@@ -84,7 +165,6 @@ function BookingDialog({
     router.push(`/booking/${newBooking.id}`);
   };
 
-  const pricingRule = getPricingRule(lot.id, vehicleType);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -95,11 +175,7 @@ function BookingDialog({
             You are booking a {vehicleType} spot at {lot.name}.
           </DialogDescription>
         </DialogHeader>
-        {pricingRule && (
-          <div className="text-sm text-muted-foreground">
-            Current rate: ${pricingRule.peakPrice}/hour (peak), ${pricingRule.offPeakPrice}/hour (off-peak).
-          </div>
-        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -128,6 +204,44 @@ function BookingDialog({
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+               <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
+             {pricingRule && (
+              <div className="text-sm rounded-lg bg-secondary/50 p-3">
+                <p><strong>Rates:</strong> ${pricingRule.peakPrice}/hr (peak), ${pricingRule.offPeakPrice}/hr (off-peak)</p>
+                {calculatedPrice !== null && (
+                  <p className="font-bold text-primary mt-1">
+                    <strong>Estimated Price:</strong> ${calculatedPrice.toFixed(2)}
+                  </p>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full">Confirm Booking</Button>
           </form>
         </Form>
