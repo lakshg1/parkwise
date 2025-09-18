@@ -258,26 +258,20 @@ function BookingDialog({
   );
 }
 
-function SlotGrid({ lot, vehicleType }: { lot: ParkingLot; vehicleType: VehicleType }) {
+function SlotGrid({
+  lot,
+  vehicleType,
+  onSlotClick,
+}: {
+  lot: ParkingLot;
+  vehicleType: VehicleType;
+  onSlotClick: (slot: ParkingSlot) => void;
+}) {
   const { getSlotsByLot } = useParkingStore();
   const slots = getSlotsByLot(lot.id);
-  const [selectedSlot, setSelectedSlot] = useState<ParkingSlot | null>(null);
 
   const carSlots = slots.filter(s => s.slotType === 'car');
   const bikeSlots = slots.filter(s => s.slotType === 'bike');
-
-  const handleSlotClick = (slot: ParkingSlot) => {
-    // Logic to check if slot is bookable for the selected vehicle type
-    if (vehicleType === 'car') {
-      if (slot.slotType === 'car' && slot.isAvailable) {
-        setSelectedSlot(slot);
-      }
-    } else { // vehicleType is 'bike'
-      if ((slot.slotType === 'bike' && slot.isAvailable) || (slot.slotType === 'car' && slot.isAvailable)) {
-        setSelectedSlot(slot);
-      }
-    }
-  };
 
   const Slot = ({ slot }: { slot: ParkingSlot }) => {
     const isForCar = slot.slotType === 'car';
@@ -295,7 +289,7 @@ function SlotGrid({ lot, vehicleType }: { lot: ParkingLot; vehicleType: VehicleT
     
     return (
         <button
-            onClick={() => handleSlotClick(slot)}
+            onClick={() => onSlotClick(slot)}
             disabled={!isBookable}
             className={cn(
                 "relative flex flex-col items-center justify-center p-2 rounded-md border-2 aspect-square transition-all duration-200",
@@ -316,35 +310,38 @@ function SlotGrid({ lot, vehicleType }: { lot: ParkingLot; vehicleType: VehicleT
   }
 
   return (
-    <>
-      {selectedSlot && (
-        <BookingDialog
-          open={!!selectedSlot}
-          onOpenChange={() => setSelectedSlot(null)}
-          slot={selectedSlot}
-          lot={lot}
-          vehicleType={vehicleType}
-        />
-      )}
-      <div>
-        <h3 className="text-lg font-semibold mt-6 mb-2">Car Slots</h3>
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-4">
-          {carSlots.map(slot => <Slot key={slot.id} slot={slot} />)}
-        </div>
-        <h3 className="text-lg font-semibold mt-6 mb-2">Bike Slots</h3>
-        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 md:gap-4">
-          {bikeSlots.map(slot => <Slot key={slot.id} slot={slot} />)}
-        </div>
+    <div>
+      <h3 className="text-lg font-semibold mt-6 mb-2">Car Slots</h3>
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-4">
+        {carSlots.map(slot => <Slot key={slot.id} slot={slot} />)}
       </div>
-    </>
+      <h3 className="text-lg font-semibold mt-6 mb-2">Bike Slots</h3>
+      <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 md:gap-4">
+        {bikeSlots.map(slot => <Slot key={slot.id} slot={slot} />)}
+      </div>
+    </div>
   );
 }
 
 export default function ParkingAvailability() {
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
   const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<ParkingSlot | null>(null);
   const { lots, getSlotsByLot } = useParkingStore();
 
+  const handleSlotClick = (slot: ParkingSlot) => {
+    // Logic to check if slot is bookable for the selected vehicle type
+    if (vehicleType === 'car') {
+      if (slot.slotType === 'car' && slot.isAvailable) {
+        setSelectedSlot(slot);
+      }
+    } else { // vehicleType is 'bike'
+      if ((slot.slotType === 'bike' && slot.isAvailable) || (slot.slotType === 'car' && slot.isAvailable)) {
+        setSelectedSlot(slot);
+      }
+    }
+  };
+  
   const lotsWithAvailability = useMemo(() => {
     return lots.map(lot => {
       const slots = getSlotsByLot(lot.id);
@@ -365,6 +362,15 @@ export default function ParkingAvailability() {
 
   return (
     <div className="space-y-8">
+      {selectedLot && selectedSlot && (
+        <BookingDialog
+          open={!!selectedSlot}
+          onOpenChange={() => setSelectedSlot(null)}
+          slot={selectedSlot}
+          lot={selectedLot}
+          vehicleType={vehicleType}
+        />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Vehicle Type</CardTitle>
@@ -415,7 +421,7 @@ export default function ParkingAvailability() {
             </CardHeader>
             {selectedLot?.id === lot.id && (
               <CardContent>
-                <SlotGrid lot={selectedLot} vehicleType={vehicleType} />
+                <SlotGrid lot={selectedLot} vehicleType={vehicleType} onSlotClick={handleSlotClick} />
               </CardContent>
             )}
           </Card>
@@ -424,5 +430,3 @@ export default function ParkingAvailability() {
     </div>
   );
 }
-
-    
