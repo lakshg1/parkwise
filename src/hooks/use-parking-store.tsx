@@ -16,7 +16,7 @@ import type {
 } from '@/lib/types';
 
 type AddBookingData = Omit<Booking, 'id' | 'status'>;
-
+type AddLotData = Omit<ParkingLot, 'id'>;
 
 interface ParkingState {
   lots: ParkingLot[];
@@ -28,6 +28,7 @@ interface ParkingState {
   getBooking: (bookingId: string) => Booking | undefined;
   getPricingRule: (lotId: string, vehicleType: VehicleType) => PricingRule | undefined;
   addBooking: (bookingData: AddBookingData) => Booking;
+  addLot: (lotData: AddLotData) => void;
   cancelBooking: (bookingId: string) => void;
   updatePricingRule: (updatedRule: PricingRule) => void;
 }
@@ -80,6 +81,55 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
     setBookings(prev => [...prev, newBooking]);
     return newBooking;
   };
+  
+  const addLot = (lotData: AddLotData) => {
+    const newLotId = `lot${lots.length + 1}`;
+    const newLot: ParkingLot = {
+      id: newLotId,
+      ...lotData,
+    };
+    setLots(prev => [...prev, newLot]);
+
+    // Generate slots for the new lot
+    const newCarSlots: ParkingSlot[] = Array.from({ length: lotData.totalCarSlots }, (_, i) => ({
+      id: `${newLotId}-car-${i + 1}`,
+      lotId: newLotId,
+      slotType: 'car',
+      slotNumber: `C${i + 1}`,
+      isAvailable: true,
+      bikeCapacity: 2,
+      bikesParked: [],
+    }));
+    const newBikeSlots: ParkingSlot[] = Array.from({ length: lotData.totalBikeSlots }, (_, i) => ({
+      id: `${newLotId}-bike-${i + 1}`,
+      lotId: newLotId,
+      slotType: 'bike',
+      slotNumber: `B${i + 1}`,
+      isAvailable: true,
+    }));
+    setSlots(prev => [...prev, ...newCarSlots, ...newBikeSlots]);
+    
+    // Generate default pricing rules for the new lot
+    const newCarRule: PricingRule = {
+      id: `rule-${pricingRules.length + 1}`,
+      lotId: newLotId,
+      vehicleType: 'car',
+      peakStartTime: '09:00',
+      peakEndTime: '18:00',
+      peakPrice: 5,
+      offPeakPrice: 3,
+    };
+     const newBikeRule: PricingRule = {
+      id: `rule-${pricingRules.length + 2}`,
+      lotId: newLotId,
+      vehicleType: 'bike',
+      peakStartTime: '09:00',
+      peakEndTime: '18:00',
+      peakPrice: 2,
+      offPeakPrice: 1,
+    };
+    setPricingRules(prev => [...prev, newCarRule, newBikeRule]);
+  };
 
   const cancelBooking = (bookingId: string) => {
     const booking = bookings.find(b => b.id === bookingId);
@@ -129,6 +179,7 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
     getBooking,
     getPricingRule,
     addBooking,
+    addLot,
     cancelBooking,
     updatePricingRule,
   };
