@@ -1,3 +1,11 @@
+
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero",
+      "description": "A modern parking garage with cars.",
+      "imageUrl": "https://picsum.photos/seed/parkwise/1920/1080",
+      "imageHint": "parking garage"
+    }
+  ]
 }
