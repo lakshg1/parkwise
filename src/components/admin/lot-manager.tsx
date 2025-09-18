@@ -10,7 +10,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Car, Bike } from 'lucide-react';
+import { PlusCircle, Car, Bike, HardHat, ChevronDown, ChevronRight, Ban } from 'lucide-react';
+import { useState } from 'react';
+import type { ParkingSlot } from '@/lib/types';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Badge } from '../ui/badge';
+import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 
 const lotFormSchema = z.object({
   name: z.string().min(3, 'Lot name must be at least 3 characters.'),
@@ -19,9 +26,75 @@ const lotFormSchema = z.object({
   totalBikeSlots: z.coerce.number().min(0, 'Cannot be negative.'),
 });
 
+const LotSlotsManager = ({ lotId }: { lotId: string }) => {
+    const { getSlotsByLot, setSlotStatus } = useParkingStore();
+    const slots = getSlotsByLot(lotId);
+  
+    const handleStatusChange = (slotId: string, newStatus: boolean) => {
+        setSlotStatus(slotId, newStatus ? 'available' : 'maintenance');
+    };
+    
+    return (
+        <div className="space-y-4 pt-4">
+            <h4 className="font-semibold text-lg">Manage Slots</h4>
+             <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Slot</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Maintenance Mode</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {slots.map(slot => (
+                  <TableRow key={slot.id}>
+                    <TableCell className="font-medium">{slot.slotNumber}</TableCell>
+                    <TableCell>
+                        {slot.slotType === 'car' ? 
+                            <Car className="h-5 w-5 text-muted-foreground" /> : 
+                            <Bike className="h-5 w-5 text-muted-foreground" />}
+                    </TableCell>
+                    <TableCell>
+                         <Badge 
+                            variant={
+                                slot.status === 'available' ? 'default' :
+                                slot.status === 'occupied' ? 'secondary' :
+                                'destructive'
+                            }
+                            className={cn(
+                                'capitalize',
+                                slot.status === 'available' && 'bg-green-500/80'
+                            )}
+                         >
+                            {slot.status}
+                         </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                            <Label htmlFor={`maintenance-switch-${slot.id}`}>
+                                {slot.status === 'maintenance' ? 'On' : 'Off'}
+                            </Label>
+                            <Switch
+                                id={`maintenance-switch-${slot.id}`}
+                                checked={slot.status === 'maintenance'}
+                                onCheckedChange={(checked) => handleStatusChange(slot.id, !checked)}
+                                disabled={slot.status === 'occupied'}
+                            />
+                        </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+        </div>
+    )
+}
+
 export default function LotManager() {
   const { lots, addLot } = useParkingStore();
   const { toast } = useToast();
+  const [openLotId, setOpenLotId] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof lotFormSchema>>({
     resolver: zodResolver(lotFormSchema),
@@ -43,38 +116,38 @@ export default function LotManager() {
   }
 
   return (
-    <div className="grid md:grid-cols-3 gap-8">
-      <div className="md:col-span-2">
-        <Card>
+    <div className="grid md:grid-cols-3 gap-8 items-start">
+      <div className="md:col-span-2 space-y-4">
+         <Card>
           <CardHeader>
             <CardTitle>Existing Lots</CardTitle>
-            <CardDescription>A list of all parking lots currently in the system.</CardDescription>
+            <CardDescription>A list of all parking lots currently in the system. Click to manage slots.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-center">
-                    <Car className="h-5 w-5 inline-block" />
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <Bike className="h-5 w-5 inline-block" />
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lots.map(lot => (
-                  <TableRow key={lot.id}>
-                    <TableCell className="font-medium">{lot.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{lot.location}</TableCell>
-                    <TableCell className="text-center">{lot.totalCarSlots}</TableCell>
-                    <TableCell className="text-center">{lot.totalBikeSlots}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {lots.map(lot => (
+                <Collapsible key={lot.id} open={openLotId === lot.id} onOpenChange={() => setOpenLotId(prev => prev === lot.id ? null : lot.id)}>
+                    <CollapsibleTrigger asChild>
+                       <div className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                            <div>
+                                <p className="font-medium">{lot.name}</p>
+                                <p className="text-sm text-muted-foreground">{lot.location}</p>
+                            </div>
+                             <div className="flex items-center gap-6 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <Car className="h-5 w-5"/> {lot.totalCarSlots}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Bike className="h-5 w-5"/> {lot.totalBikeSlots}
+                                </div>
+                                {openLotId === lot.id ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                            </div>
+                       </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-4">
+                        <LotSlotsManager lotId={lot.id} />
+                    </CollapsibleContent>
+                </Collapsible>
+            ))}
           </CardContent>
         </Card>
       </div>

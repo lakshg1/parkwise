@@ -1,5 +1,6 @@
 export type VehicleType = 'car' | 'bike';
 export type UserRole = 'user' | 'admin';
+export type SlotStatus = 'available' | 'occupied' | 'maintenance';
 
 export interface ParkingLot {
   id: string;
@@ -15,12 +16,13 @@ export interface ParkingSlot {
   slotType: VehicleType;
   slotNumber: string;
   isAvailable: boolean;
+  status: SlotStatus;
   bikeCapacity?: number; // For car slots that can hold bikes
   bikesParked?: string[]; // To track which bikes (by vehicleNumber) are in a car slot
 }
 
 export interface Booking {
-  id: string;
+  id:string;
   userName: string;
   vehicleNumber: string;
   vehicleType: VehicleType;

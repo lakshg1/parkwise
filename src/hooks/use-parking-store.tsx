@@ -13,6 +13,7 @@ import type {
   PricingRule,
   Booking,
   VehicleType,
+  SlotStatus,
 } from '@/lib/types';
 
 type AddBookingData = Omit<Booking, 'id' | 'status'>;
@@ -31,6 +32,7 @@ interface ParkingState {
   addLot: (lotData: AddLotData) => void;
   cancelBooking: (bookingId: string) => void;
   updatePricingRule: (updatedRule: PricingRule) => void;
+  setSlotStatus: (slotId: string, status: SlotStatus) => void;
 }
 
 const ParkingContext = createContext<ParkingState | undefined>(undefined);
@@ -62,16 +64,16 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
         return prevSlots.map(slot => {
             if (slot.id === newBooking.slotId) {
                 if (newBooking.vehicleType === 'car') {
-                    return { ...slot, isAvailable: false };
+                    return { ...slot, isAvailable: false, status: 'occupied' };
                 }
                 // Handle bike booking
                 if (slot.slotType === 'bike') {
-                    return { ...slot, isAvailable: false };
+                    return { ...slot, isAvailable: false, status: 'occupied' };
                 }
                 if (slot.slotType === 'car') {
                     const newBikesParked = [...(slot.bikesParked || []), newBooking.vehicleNumber];
                     const isNowFull = newBikesParked.length >= (slot.bikeCapacity || 2);
-                    return { ...slot, isAvailable: !isNowFull, bikesParked: newBikesParked };
+                    return { ...slot, isAvailable: !isNowFull, bikesParked: newBikesParked, status: isNowFull ? 'occupied' : 'available' };
                 }
             }
             return slot;
@@ -97,6 +99,7 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
       slotType: 'car',
       slotNumber: `C${i + 1}`,
       isAvailable: true,
+      status: 'available',
       bikeCapacity: 2,
       bikesParked: [],
     }));
@@ -106,6 +109,7 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
       slotType: 'bike',
       slotNumber: `B${i + 1}`,
       isAvailable: true,
+      status: 'available',
     }));
     setSlots(prev => [...prev, ...newCarSlots, ...newBikeSlots]);
     
@@ -139,15 +143,15 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
         return prevSlots.map(slot => {
             if (slot.id === booking.slotId) {
                 if (booking.vehicleType === 'car') {
-                    return { ...slot, isAvailable: true };
+                    return { ...slot, isAvailable: true, status: 'available' };
                 }
                 // Handle bike cancellation
                 if (slot.slotType === 'bike') {
-                    return { ...slot, isAvailable: true };
+                    return { ...slot, isAvailable: true, status: 'available' };
                 }
                 if (slot.slotType === 'car') {
                     const newBikesParked = (slot.bikesParked || []).filter(bikeNum => bikeNum !== booking.vehicleNumber);
-                    return { ...slot, isAvailable: true, bikesParked: newBikesParked };
+                    return { ...slot, isAvailable: true, bikesParked: newBikesParked, status: 'available' };
                 }
             }
             return slot;
@@ -169,6 +173,13 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const setSlotStatus = (slotId: string, status: SlotStatus) => {
+    setSlots(prevSlots => prevSlots.map(slot => 
+      slot.id === slotId ? { ...slot, status, isAvailable: status === 'available' } : slot
+    ));
+  };
+
+
   const value = {
     lots,
     slots,
@@ -182,6 +193,7 @@ export function ParkingProvider({ children }: { children: ReactNode }) {
     addLot,
     cancelBooking,
     updatePricingRule,
+    setSlotStatus,
   };
 
   return <ParkingContext.Provider value={value}>{children}</ParkingContext.Provider>;

@@ -19,6 +19,7 @@ export const mockParkingSlots: ParkingSlot[] = [
     slotType: 'car' as const,
     slotNumber: `C${i + 1}`,
     isAvailable: true,
+    status: 'available' as const,
     bikeCapacity: 2,
     bikesParked: [],
   })),
@@ -28,6 +29,7 @@ export const mockParkingSlots: ParkingSlot[] = [
     slotType: 'bike' as const,
     slotNumber: `B${i + 1}`,
     isAvailable: true,
+    status: 'available' as const,
   })),
   // Lot 2 Slots
   ...Array.from({ length: 15 }, (_, i) => ({
@@ -36,6 +38,7 @@ export const mockParkingSlots: ParkingSlot[] = [
     slotType: 'car' as const,
     slotNumber: `C${i + 1}`,
     isAvailable: true,
+    status: 'available' as const,
     bikeCapacity: 2,
     bikesParked: [],
   })),
@@ -45,14 +48,19 @@ export const mockParkingSlots: ParkingSlot[] = [
     slotType: 'bike' as const,
     slotNumber: `B${i + 1}`,
     isAvailable: true,
+    status: 'available' as const,
   })),
 ];
 
 // Pre-book some slots for demonstration
 mockParkingSlots[2].isAvailable = false; // Lot 1, C3
+mockParkingSlots[2].status = 'occupied';
 mockParkingSlots[5].isAvailable = false; // Lot 1, C6
+mockParkingSlots[5].status = 'occupied';
 mockParkingSlots[21].isAvailable = false; // Lot 1, B2
+mockParkingSlots[21].status = 'occupied';
 mockParkingSlots[32].isAvailable = false; // Lot 2, C3
+mockParkingSlots[32].status = 'occupied';
 
 export const mockPricingRules: PricingRule[] = [
     {
